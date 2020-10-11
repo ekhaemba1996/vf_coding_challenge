@@ -1,0 +1,81 @@
+service: vf-coding-challenge
+
+frameworkVersion: '2'
+plugins:
+    - serverless-s3-sync
+    - invoke-push
+custom:
+  s3Sync:
+    - bucketName: eltons-pokemon-bucket
+      bucketPrefix: data 
+      localDir: ./data 
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: dev
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:ListBucket"
+      Resource:
+        Fn::GetAtt: [ PokemonBucket, Arn ]
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource:
+        Fn::Join: ['', [Fn::GetAtt: [ PokemonBucket, Arn ], '/*'] ]
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:BatchWriteItem
+      Resource:
+        - Fn::GetAtt: [ PokemonTable, Arn ]
+        - Fn::Join: ['/', [Fn::GetAtt: [ PokemonTable, Arn ], 'index/*'] ]
+  environment:
+    BUCKET_NAME: eltons-pokemon-bucket
+    DATA_KEY: data/Pokemon.csv
+    TABLE_NAME: PokemonTable
+
+functions:
+  pushToDynamo:
+    handler: handler.handle
+    environment:
+      BUCKET_NAME: ${self:provider.environment.BUCKET_NAME}
+    timeout: 30
+
+resources:
+  Resources:
+    PokemonBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.BUCKET_NAME}
+    PokemonTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: Type
+            AttributeType: S
+          - AttributeName: Name
+            AttributeType: S
+          - AttributeName: StatSum
+            AttributeType: N
+        KeySchema:
+          - AttributeName: Type
+            KeyType: HASH
+          - AttributeName: Name
+            KeyType: RANGE
+        LocalSecondaryIndexes:
+          - IndexName: LSI
+            KeySchema: 
+              - AttributeName: Type
+                KeyType: HASH
+              - AttributeName: StatSum
+                KeyType: RANGE
+            Projection: 
+              ProjectionType: 'ALL'
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
