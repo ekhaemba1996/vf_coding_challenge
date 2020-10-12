@@ -4,6 +4,7 @@ frameworkVersion: '2'
 plugins:
     - serverless-s3-sync
     - invoke-push
+    - serverless-iam-roles-per-function
 custom:
   s3Sync:
     - bucketName: eltons-pokemon-bucket
@@ -15,35 +16,54 @@ provider:
   runtime: python3.8
   stage: dev
   region: us-east-1
-  iamRoleStatements:
-    - Effect: "Allow"
-      Action:
-        - "s3:ListBucket"
-      Resource:
-        Fn::GetAtt: [ PokemonBucket, Arn ]
-    - Effect: "Allow"
-      Action:
-        - "s3:GetObject"
-      Resource:
-        Fn::Join: ['', [Fn::GetAtt: [ PokemonBucket, Arn ], '/*'] ]
-    - Effect: Allow
-      Action:
-        - dynamodb:DescribeTable
-        - dynamodb:BatchWriteItem
-      Resource:
-        - Fn::GetAtt: [ PokemonTable, Arn ]
-        - Fn::Join: ['/', [Fn::GetAtt: [ PokemonTable, Arn ], 'index/*'] ]
   environment:
+    TABLE_NAME: PokemonTable
     BUCKET_NAME: eltons-pokemon-bucket
     DATA_KEY: data/Pokemon.csv
-    TABLE_NAME: PokemonTable
 
 functions:
   pushToDynamo:
-    handler: handler.handle
-    environment:
-      BUCKET_NAME: ${self:provider.environment.BUCKET_NAME}
+    handler: data-ingest.handle
     timeout: 30
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - "s3:ListBucket"
+        Resource:
+          Fn::GetAtt: [ PokemonBucket, Arn ]
+      - Effect: "Allow"
+        Action:
+          - "s3:GetObject"
+        Resource:
+          Fn::Join: ['', [Fn::GetAtt: [ PokemonBucket, Arn ], '/*'] ]
+      - Effect: Allow
+        Action:
+          - dynamodb:DescribeTable
+          - dynamodb:BatchWriteItem
+        Resource:
+          - Fn::GetAtt: [ PokemonTable, Arn ]
+          - Fn::Join: ['/', [Fn::GetAtt: [ PokemonTable, Arn ], 'index/*'] ]
+  getTypesPokemon:
+    handler: api/get-types.handle
+    timeout: 30
+    events:
+      - http:
+          path: get_pokemon_type/{type}
+          method: get
+          request:
+            parameters:
+              query:
+                min_sum: true
+              paths:
+                type: true 
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:DescribeTable
+          - dynamodb:Query
+        Resource:
+          - Fn::GetAtt: [ PokemonTable, Arn ]
+          - Fn::Join: ['/', [Fn::GetAtt: [ PokemonTable, Arn ], 'index/*'] ]
 
 resources:
   Resources:
@@ -68,7 +88,7 @@ resources:
           - AttributeName: Name
             KeyType: RANGE
         LocalSecondaryIndexes:
-          - IndexName: LSI
+          - IndexName: StatIndex
             KeySchema: 
               - AttributeName: Type
                 KeyType: HASH
@@ -76,6 +96,18 @@ resources:
                 KeyType: RANGE
             Projection: 
               ProjectionType: 'ALL'
+        GlobalSecondaryIndexes:
+          - IndexName: NameIndex
+            KeySchema: 
+              - AttributeName: Name
+                KeyType: HASH
+              - AttributeName: Type
+                KeyType: RANGE
+            Projection: 
+              ProjectionType: 'ALL'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1

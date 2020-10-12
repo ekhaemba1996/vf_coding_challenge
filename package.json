@@ -18,5 +18,8 @@
   "homepage": "https://github.com/ekhaemba1996/vf_coding_challenge#readme",
   "dependencies": {
     "serverless-s3-sync": "^1.15.0"
+  },
+  "devDependencies": {
+    "serverless-iam-roles-per-function": "^2.0.2"
   }
 }
