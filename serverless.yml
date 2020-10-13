@@ -43,12 +43,12 @@ functions:
         Resource:
           - Fn::GetAtt: [ PokemonTable, Arn ]
           - Fn::Join: ['/', [Fn::GetAtt: [ PokemonTable, Arn ], 'index/*'] ]
-  getTypesPokemon:
-    handler: api/get-types.handle
+  getPokemonByType:
+    handler: api/get_pokemon_by_type.handle
     timeout: 30
     events:
       - http:
-          path: get_pokemon_type/{type}
+          path: get_pokemon_by_type/{type}
           method: get
           request:
             parameters:
@@ -56,6 +56,25 @@ functions:
                 min_sum: true
               paths:
                 type: true 
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:DescribeTable
+          - dynamodb:Query
+        Resource:
+          - Fn::GetAtt: [ PokemonTable, Arn ]
+          - Fn::Join: ['/', [Fn::GetAtt: [ PokemonTable, Arn ], 'index/*'] ]
+  getNamedPokemon:
+    handler: api/get_pokemon_by_name.handle
+    timeout: 30
+    events:
+      - http:
+          path: get_pokemon_by_name/{name}
+          method: get
+          request:
+            parameters:
+              paths:
+                name: true 
     iamRoleStatements:
       - Effect: Allow
         Action:
