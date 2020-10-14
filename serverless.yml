@@ -24,7 +24,7 @@ provider:
 functions:
   pushToDynamo:
     handler: data-ingest.handle
-    timeout: 30
+    timeout: 60
     iamRoleStatements:
       - Effect: "Allow"
         Action:
@@ -53,6 +53,7 @@ functions:
           request:
             parameters:
               query:
+                secondary: true
                 min_sum: true
               paths:
                 type: true 
@@ -95,32 +96,45 @@ resources:
       Properties:
         TableName: ${self:provider.environment.TABLE_NAME}
         AttributeDefinitions:
-          - AttributeName: Type
+          - AttributeName: PK
             AttributeType: S
-          - AttributeName: Name
+          - AttributeName: SK
             AttributeType: S
-          - AttributeName: StatSum
+          - AttributeName: Data
+            AttributeType: S
+          - AttributeName: Total
             AttributeType: N
         KeySchema:
-          - AttributeName: Type
+          - AttributeName: PK
             KeyType: HASH
-          - AttributeName: Name
+          - AttributeName: SK
             KeyType: RANGE
         LocalSecondaryIndexes:
-          - IndexName: StatIndex
+          - IndexName: TotalIndex
             KeySchema: 
-              - AttributeName: Type
+              - AttributeName: PK
                 KeyType: HASH
-              - AttributeName: StatSum
+              - AttributeName: Total
                 KeyType: RANGE
             Projection: 
               ProjectionType: 'ALL'
         GlobalSecondaryIndexes:
-          - IndexName: NameIndex
+          - IndexName: InvertedIndex
             KeySchema: 
-              - AttributeName: Name
+              - AttributeName: SK
                 KeyType: HASH
-              - AttributeName: Type
+              - AttributeName: PK
+                KeyType: RANGE
+            Projection: 
+              ProjectionType: 'ALL'
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: SecondaryTypeIndex
+            KeySchema: 
+              - AttributeName: Data
+                KeyType: HASH
+              - AttributeName: Total
                 KeyType: RANGE
             Projection: 
               ProjectionType: 'ALL'

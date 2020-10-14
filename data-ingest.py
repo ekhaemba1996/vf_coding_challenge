@@ -6,15 +6,14 @@ import os
 s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 
-def readRow(row, batch):
-    # Update keys
+def get_pokemon_meta(row):
+    row['PK'] = f"PrimaryType#{row.pop('Type 1')}"
+    row['SK'] = f"Pokemon#{row.pop('Name')}"
+    row['Data'] = f"SecondaryType#{row.pop('Type 2')}"
     row['PokedexId'] = row.pop('#')
-    row['Type'] = row.pop('Type 1')
-    row['SecondaryType'] = row.pop('Type 2')
-    row['StatSum'] = int(row.pop('Total'))
-    response = batch.put_item(Item=row)
-    print("Added pokemon", row['Name'])
-
+    row['Total'] = int(row['Total'])
+    return row
+    
 def handle(event, context):
     # Key and Bucket Name from environment variables
     bucket_name = os.environ['BUCKET_NAME']
@@ -26,11 +25,14 @@ def handle(event, context):
     csv_data = csv.DictReader(csvcontent)
 
     table = dynamodb.Table(table_name)
+    records = []
     with table.batch_writer() as batch:
         for row in csv_data:
-            readRow(row, batch)
+            records.append(get_pokemon_meta(row))
+        for rec in records:
+            batch.put_item(Item=rec)
     body = {
-        "message": "Go Serverless v1.0! Your function executed successfully!",
+        "message": f"Data Ingestion function executed successfully! Created pokemon {len(records)}records",
         "input": event
     }
 

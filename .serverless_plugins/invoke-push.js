@@ -17,7 +17,7 @@ const invokeLambda = (serverless, options) => new Promise((resolve, reject)=>{
     FunctionName: functionName,
     Payload: "{}"
   };
-
+  // Invoke the function with parameters and log the result
   lambdaClient.invoke(params, function(err,data){
     if(err){
       serverless.cli.log(`Function ${functionName} failed on invocation`);
@@ -32,6 +32,7 @@ class InvokePlugin {
   constructor(serverless, options) {
     this.serverless = serverless;
     this.options = options;
+    // Apply hook after the deployment event of the `serverless deploy` command
     this.hooks = {
       'after:deploy:deploy': invokeLambda.bind(null, serverless, options)
     };
