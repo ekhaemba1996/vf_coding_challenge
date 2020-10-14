@@ -15,14 +15,14 @@ def decimal_default(obj):
 dynamodb = boto3.resource('dynamodb')
 
 def handle(event, context):
-    # Key and Bucket Name from environment variables
+    # Table Name from environment variables
     table_name = os.environ['TABLE_NAME']
     
     table = dynamodb.Table(table_name)
     pokemon_name = event['pathParameters']['name']
     kargs = {
-        'IndexName': 'NameIndex',
-        'KeyConditionExpression': Key('Name').eq(pokemon_name)
+        'IndexName': 'InvertedIndex',
+        'KeyConditionExpression': Key('SK').eq(f'Pokemon#{pokemon_name}')
     }
     query_result = table.query(
         **kargs
